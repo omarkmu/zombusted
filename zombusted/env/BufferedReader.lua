@@ -23,7 +23,7 @@ function BufferedReader:readLine()
     end
 
     local str
-    local nextLF = self.text:find('\n')
+    local nextLF = self.text:find('\n', self.ptr)
     if not nextLF then
         str = self.text:sub(self.ptr)
         self.ptr = #self.text + 1
