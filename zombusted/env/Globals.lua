@@ -15,11 +15,24 @@ local os = os
 local math = math
 
 
+-- TODO: replace with proper mock implementation
+local function arrayList(t)
+    t = t or {}
+    local elements = {}
+    local size = #t
+    for i = 1, size do elements[i - 1] = t[i] end
+
+    return {
+        size = function() return size end,
+        get = function(_, index) return elements[index] end,
+    }
+end
+
 local function getVirtualFile(filename, createIfNull, files)
     files = files or state.FILES.LuaCache
+
     local sep = package.config:sub(1, 1)
-    filename = filename:gsub('/', sep)
-    filename = filename:gsub('\\', sep)
+    filename = filename:gsub('/', sep):gsub('\\', sep)
 
     if not files[filename] then
         if not createIfNull then
@@ -32,18 +45,40 @@ local function getVirtualFile(filename, createIfNull, files)
     return files[filename]
 end
 
+local function listFilesInDirectory(directory, files)
+    if not directory then
+        return
+    end
+
+    files = files or state.FILES.LuaCache
+
+    local sep = package.config:sub(1, 1)
+    directory = directory:gsub('/', sep):gsub('\\', sep)
+    if directory:sub(-1) ~= sep then
+        directory = directory .. sep
+    end
+
+    local list = {}
+    for name in pairs(files) do
+        if name:sub(1, #directory) == directory then
+            name = name:sub(#directory + 1)
+            if not name:find(sep) then
+                list[#list + 1] = name
+            end
+        end
+    end
+
+    return arrayList(list)
+end
+
+
 install('isAdmin', function() return false end)
 
 install('isClient', function() return state.IS_CLIENT end)
 
 install('isServer', function() return state.IS_SERVER end)
 
-install('getActivatedMods', function()
-    return {
-        size = function() return 0 end,
-        get = function() end,
-    }
-end)
+install('getActivatedMods', function() return arrayList() end)
 
 install('Core', { class = {} })
 install('getCore', function()
@@ -121,16 +156,7 @@ install('getModFileWriter', function(modId, filename, createIfNull, append)
     return LuaFileWriter.newMock(file, buffer)
 end)
 
-install('getOnlinePlayers', function()
-    local players = {}
-    local size = #state.ONLINE_PLAYERS
-    for i = 1, size do players[i - 1] = state.ONLINE_PLAYERS[i] end
-
-    return {
-        size = function() return size end,
-        get = function(_, index) return players[index] end,
-    }
-end)
+install('getOnlinePlayers', function() return arrayList(state.ONLINE_PLAYERS) end)
 
 install('getPlayerByOnlineID', function(id)
     for i = 1, #state.ONLINE_PLAYERS do
@@ -179,6 +205,18 @@ install('getTimestampMs', function()
     local secs = os.time()
     local _, ms = math.modf(os.clock())
     return ((secs + ms) * 1000) --[[@as integer]]
+end)
+
+install('listFilesInModDirectory', function(modId, directory)
+    if not modId or modId:match('^%s*$') then
+        return
+    end
+
+    return listFilesInDirectory(directory, state.FILES.Mod[modId] or {})
+end)
+
+install('listFilesInZomboidLuaDirectory', function(modId, directory)
+    return listFilesInDirectory(modId, directory)
 end)
 
 install('sendClientCommand', function(...) end) -- no-op for tests
