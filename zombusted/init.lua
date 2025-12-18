@@ -14,6 +14,22 @@ local zombusted = {}
 ---@type table<busted.context, function[]>
 local testEndCallbacks = {}
 
+---Converts a value to a string for display.
+---If the value cannot convert to a string, this converts to a representation of its type.
+---@param value string
+---@return string
+local function str(value)
+    local _type = type(value)
+    if _type == 'string' then
+        return string.format('%q', value)
+    end
+
+    if _type == 'number' or _type == 'boolean' or util.hastostring(value) then
+        return tostring(value)
+    end
+
+    return '(' .. _type .. ')'
+end
 
 ---Initialization function.
 ---Must be called to populate the global environment with test functions.
@@ -28,6 +44,7 @@ function zombusted.init(busted)
 
     busted.export('zomboid', require('zombusted.zomboid'))
     busted.export('reload_module', zombusted.reload_module)
+    busted.export('theory', zombusted.theory)
     busted.subscribe({ 'test', 'end' }, zombusted.on_test_end)
 
     return true
@@ -118,6 +135,92 @@ function zombusted.stub_module(mod, ...)
     end
 
     return _stub
+end
+
+---@generic T
+---@param name string The test name.
+---@param test fun(arg: T) The function to execute for each test.
+---@param ... T Values to pass to the function.
+function zombusted.theory(name, test, ...)
+    local data = { ... }
+    local count = select('#', ...)
+    if count == 1 and type(data[1]) == 'table' then
+        -- must be a list
+        if data[1][1] then
+            data = data[1]
+            count = #data
+        end
+    end
+
+    for i = 1, count do
+        local args = data[i] --[[@as any]]
+
+        local referenced = {}
+
+        local isTable = type(args) == 'table'
+        local testName = name:gsub('{([^}]-)}', function(match)
+            local value
+            if isTable then
+                value = args[match]
+                if match == '0' and value == nil then
+                    value = args
+                end
+            else
+                value = match == '0' and args or nil
+            end
+
+            if value ~= nil then
+                referenced[match] = true
+                return str(value)
+            end
+
+            return '{' .. match .. '}'
+        end)
+
+        if isTable then
+            local keys = {}
+            local isList = true
+            for k in pairs(args) do
+                if not referenced[k] then
+                    keys[#keys + 1] = k
+                    if type(k) ~= 'number' then
+                        isList = false
+                    end
+                end
+            end
+
+            table.sort(keys, function(a, b)
+                return tostring(a) < tostring(b)
+            end)
+
+            local nextNumeric = 1
+            local argDisplay = {}
+            for j = 1, #keys do
+                local k = keys[j]
+                local v = args[k]
+                if isList and k == nextNumeric then
+                    nextNumeric = nextNumeric + 1
+                else
+                    argDisplay[#argDisplay + 1] = tostring(k)
+                    argDisplay[#argDisplay + 1] = ': '
+                end
+
+                argDisplay[#argDisplay + 1] = str(v)
+                argDisplay[#argDisplay + 1] = ', '
+            end
+
+            if #argDisplay > 0 then
+                argDisplay[#argDisplay] = nil
+                testName = testName .. ' [' .. table.concat(argDisplay) .. ']'
+            end
+        elseif not referenced['0'] then
+            testName = testName .. ' [value: ' .. str(args) .. ']'
+        end
+
+        state.api.it(testName, function()
+            test(args)
+        end)
+    end
 end
 
 ---Determines the function to use for reverting a stub, spy, or snapshot
