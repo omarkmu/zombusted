@@ -227,6 +227,8 @@ install('triggerEvent', function(name, ...)
     LuaEventManager.triggerEvent(name, ...)
 end)
 
+install('Locale', {})
+
 install('Faction', {
     getPlayerFaction = function(player)
         if not player._faction then
