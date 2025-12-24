@@ -17,6 +17,10 @@ function BufferedReader:read()
     return char:byte()
 end
 
+function BufferedReader:ready()
+    return self.ptr <= #self.text
+end
+
 function BufferedReader:readLine()
     if self.ptr > #self.text then
         return
