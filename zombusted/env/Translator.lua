@@ -15,3 +15,7 @@ end
 function Translator.getLanguage()
     return state.LANGUAGE
 end
+
+function Translator.new()
+    return {}
+end

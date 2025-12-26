@@ -158,6 +158,8 @@ end)
 
 install('getOnlinePlayers', function() return arrayList(state.ONLINE_PLAYERS) end)
 
+install('getNumClassFields', function() return 0 end)
+
 install('getPlayerByOnlineID', function(id)
     for i = 1, #state.ONLINE_PLAYERS do
         local player = state.ONLINE_PLAYERS[i] ---@type any
